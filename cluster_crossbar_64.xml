@@ -1,0 +1,18 @@
+<?xml version='1.0'?>
+<!DOCTYPE platform SYSTEM "http://simgrid.gforge.inria.fr/simgrid/simgrid.dtd">
+<platform version="4.1">
+
+<!--  WARNING:  This <config></config> clause below
+specifies a bogus host-speed value, which is ok because  
+for this module we don't measure execution times. And this way,
+no warning is generated when running smpirun.
+-->
+<config>
+<prop id="smpi/host-speed" value="1f"></prop>
+</config>
+
+
+<zone id="AS0" routing="Full">
+<cluster id="cluster" prefix="host-" suffix=".hawaii.edu" radical="0-63" speed="200Gf" bw="10Gbps" lat="20us"/>
+</zone>
+</platform>
