@@ -68,39 +68,116 @@ int main(int argc, char * argv[]){//beginning of main===========================
     MPI_Comm_split(MPI_COMM_WORLD, p_col, rank, &comm_col);
     MPI_Comm_rank(comm_col, &rank_col);
 
+    printf("================================================\n");
+    //check_comm_info(p_row, p_col, comm_row, comm_col, rank);
+    /*
+    printf("I am process %i = (%i, %i)\n", rank, p_row, p_col);
+    printf("My ranks are: %i = (%i, %i)\n", rank, rank_row, rank_col);
+    if(p_row != 0) {
+        int dest = (rank_row - p_row) % dim_proc;
+        if (dest < 0) {
+            dest += dim_proc;
+        }
+        int from = (rank_row + p_row) % dim_proc;
+        if (from < 0) {
+            from += dim_proc;
+        }
+        printf("I am sending A to rank_row %i\n", dest);
+        printf("I am receiving A from rank_row %i\n", from);
+    }
+
+    if(p_col != 0) {
+        int dest = (rank_col - rank_row) % dim_proc;
+        if (dest < 0) {
+            dest += dim_proc;
+        }
+        int from = (rank_col + rank_row) % dim_proc;
+        if (from < 0) {
+            from += dim_proc;
+        }
+        //printf("I am sending B to rank_col %i\n", dest);
+        //printf("I am receiving B from rank_col %i\n", from);
+    }*/
+    
+    //===============================================================
+    //Preskewing
+    // Row i shifts to the left by i
+    
+    int dest, from;
+    MPI_Status status;
+    if (p_row != 0) {
+        dest = (rank_row - p_row) % dim_proc;
+        if (dest < 0) dest += dim_proc;
+        from = (rank_row + p_row) % dim_proc;
+        // if (from < 0) {
+        //     from += dim_proc;
+        // }
+        //MPI_Bsend(A, n * n, MPI_LONG_DOUBLE, dest, 0, comm_row);
+        //MPI_Recv( A, n * n, MPI_LONG_DOUBLE, from, 0, comm_row, MPI_STATUS_IGNORE);
+        MPI_Sendrecv_replace(A, n * n, MPI_LONG_DOUBLE, dest, 0, from, 0, comm_row, &status);
+    }
+    //printf("I am process %i = (%i, %i)\n", rank, p_row, p_col);
+    
+    
+    // Col i shifts to the top by i
+    
+    
+    if (p_col != 0) {
+        dest = (rank_col - p_col) % dim_proc;
+        if (dest < 0) dest += dim_proc;
+        from = (rank_col + p_col) % dim_proc;
+        // if (from < 0) {
+        //     from += dim_proc;
+        // }
+        //MPI_Bsend(B, n * n, MPI_LONG_DOUBLE, dest, 0, comm_col);
+        MPI_Sendrecv_replace(B, n * n, MPI_LONG_DOUBLE, dest, 0, from, 0, comm_col, &status);
+    }
+    //if(p_col != 0) {
+    //    MPI_Recv( B, n * n, MPI_LONG_DOUBLE, from, 0, comm_col, &status);
+    //}
+
+
+
+
+    printf("I am process %i = (%i, %i)\n", rank, p_row, p_col);
+    
+    // core computation
+    for (int k = 0; k < dim_proc; k ++) {
+        matrix_multiply_add(C, A, B, n);
+
+        //horizontal shift
+        dest = (rank_row - 1) % dim_proc;
+        if(dest < 0) dest += dim_proc;
+
+        from = (rank_row + 1) % dim_proc;
+        if(from < 0) from += dim_proc;
+        MPI_Sendrecv_replace(A, n * n, MPI_LONG_DOUBLE, dest, 0, from, 0, comm_row, &status);
+
+        //vertical shift
+        dest = (rank_col - 1) % dim_proc;
+        if(dest < 0) dest += dim_proc;
+
+        from = (rank_col + 1) % dim_proc;
+        //if(from < 0) from += dim_proc;
+        MPI_Sendrecv_replace(B, n * n, MPI_LONG_DOUBLE, dest, 0, from, 0, comm_col, &status);
+        /*
+        //horizontal shift
+        MPI_Bsend(A, n * n, MPI_LONG_DOUBLE, (rank_col - 1) % dim_proc, 0, comm_row);
+        //vertical shift
+        MPI_Bsend(B, n * n, MPI_LONG_DOUBLE, (rank_row - 1) % dim_proc, 0, comm_col);
+    
+        MPI_Recv(A, n * n, MPI_LONG_DOUBLE, (rank_col + 1) % dim_proc, 0, comm_row, MPI_STATUS_IGNORE);
+        MPI_Recv(B, n * n, MPI_LONG_DOUBLE, (rank_row + 1) % dim_proc, 0, comm_col, MPI_STATUS_IGNORE);
+        */
+    }
+
+    //Post skewing
+
+
     /*sanity check: 
     * Print out the communicator information for debigging.
     * check_comm_info(p_row, p_col, comm_row, comm_col, rank);
     */
-
-    //core computation    
-    for (int k = 0; k < dim_proc; k ++) {
-        
-        /* Deprecated: works, but sketchy.
-        //Row-wise broadcast
-        if (rank_row == k) {bufferA = A;}
-        MPI_Bcast(bufferA, n * n, MPI_LONG_DOUBLE, k, comm_row);
-
-        //column-wise broadcast
-        if (rank_col == k) {bufferB = B;}
-        MPI_Bcast(bufferB, n * n, MPI_LONG_DOUBLE, k, comm_col);
-        */
-        
-        //Row-wise broadcast
-        MPI_Bcast(rank_row == k ? A : bufferA, n * n, MPI_LONG_DOUBLE, k, comm_row);
-        //Column-wise broadcast
-        MPI_Bcast(rank_col == k ? B : bufferB, n * n, MPI_LONG_DOUBLE, k, comm_col);
-
-        if ((p_row == k) && (p_col == k)) {
-            matrix_multiply_add(C, A, B, n);
-        } else if (p_row == k) {
-            matrix_multiply_add(C, bufferA, B, n);
-        } else if (p_col == k) {
-            matrix_multiply_add(C, A, bufferB, n);
-        } else {
-            matrix_multiply_add(C, bufferA, bufferB, n);
-        }
-    }
 
     //check the sum and send to the root. report to user.
     for (int i = 0; i < n; i ++) {
@@ -147,7 +224,7 @@ void check_comm_info(int p_row, int p_col, MPI_Comm comm_row, MPI_Comm comm_col,
     int name_length;
     MPI_Comm_get_name(comm_row, comm_row_name, &name_length);
     MPI_Comm_get_name(comm_col, comm_col_name, &name_length);
-    printf("I am rank %i=(%i, %i), in communicator %s and %s.\n", rank, p_row, p_col, comm_row_name, comm_col_name);
+    printf("I am process %i=(%i, %i), in communicator %s and %s.\n", rank, p_row, p_col, comm_row_name, comm_col_name);
 }
 
 

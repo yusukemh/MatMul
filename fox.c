@@ -40,7 +40,7 @@ int main(int argc, char * argv[]){//beginning of main===========================
     long double *B = (long double *)malloc(n * n * sizeof(long double));
     long double *C = (long double *)calloc(n * n,  sizeof(long double));
     long double *bufferA = (long double *)malloc(n * n * sizeof(long double));
-    long double *bufferB = (long double *)malloc(n * n * sizeof(long double));
+    //long double *bufferB = (long double *)malloc(n * n * sizeof(long double));
     
     //Determine the coordinates of the process
     int p_row = rank / dim_proc;
@@ -73,18 +73,23 @@ int main(int argc, char * argv[]){//beginning of main===========================
     * check_comm_info(p_row, p_col, comm_row, comm_col, rank);
     */
 
-    //core computation    
     for (int k = 0; k < dim_proc; k ++) {
-        
-        /* Deprecated: works, but sketchy.
-        //Row-wise broadcast
-        if (rank_row == k) {bufferA = A;}
-        MPI_Bcast(bufferA, n * n, MPI_LONG_DOUBLE, k, comm_row);
+        //broadcast k'th diagonal of A
+        MPI_Bcast((k + rank_row) % dim_proc == rank_col ? A : bufferA, n * n, MPI_LONG_DOUBLE, (k + rank_row) % dim_proc, comm_row);
+        // shift B
+        MPI_Bsend(B, n * n, MPI_LONG_DOUBLE, (rank_row - 1) % dim_proc, 0, comm_col);
+        MPI_Recv( B, n * n, MPI_LONG_DOUBLE, (rank_row - 1) % dim_proc, 0, comm_col, MPI_STATUS_IGNORE);
 
-        //column-wise broadcast
-        if (rank_col == k) {bufferB = B;}
-        MPI_Bcast(bufferB, n * n, MPI_LONG_DOUBLE, k, comm_col);
-        */
+        if( (k + rank_row) % dim_proc == rank_col) {
+            matrix_multiply_add(C, A, B, n);
+        } else {
+            matrix_multiply_add(C, bufferA, B, n);
+        }
+    }
+
+    //core computation
+    /* 
+    for (int k = 0; k < dim_proc; k ++) {
         
         //Row-wise broadcast
         MPI_Bcast(rank_row == k ? A : bufferA, n * n, MPI_LONG_DOUBLE, k, comm_row);
@@ -100,7 +105,7 @@ int main(int argc, char * argv[]){//beginning of main===========================
         } else {
             matrix_multiply_add(C, bufferA, bufferB, n);
         }
-    }
+    }*/
 
     //check the sum and send to the root. report to user.
     for (int i = 0; i < n; i ++) {
