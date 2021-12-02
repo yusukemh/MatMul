@@ -72,13 +72,18 @@ int main(int argc, char * argv[]){//beginning of main===========================
     * Print out the communicator information for debigging.
     * check_comm_info(p_row, p_col, comm_row, comm_col, rank);
     */
-
+    int dest, from, root;
+    MPI_Status status;
     for (int k = 0; k < dim_proc; k ++) {
         //broadcast k'th diagonal of A
-        MPI_Bcast((k + rank_row) % dim_proc == rank_col ? A : bufferA, n * n, MPI_LONG_DOUBLE, (k + rank_row) % dim_proc, comm_row);
-        // shift B
-        MPI_Bsend(B, n * n, MPI_LONG_DOUBLE, (rank_row - 1) % dim_proc, 0, comm_col);
-        MPI_Recv( B, n * n, MPI_LONG_DOUBLE, (rank_row - 1) % dim_proc, 0, comm_col, MPI_STATUS_IGNORE);
+        root = (k + p_row) % dim_proc;
+        MPI_Bcast(rank_row == root ? A : bufferA, n * n, MPI_LONG_DOUBLE, root, comm_row);
+
+        //vertical shift of B
+        dest = (rank_col - 1) % dim_proc;
+        if(dest < 0) dest += dim_proc;
+        from = (rank_col + 1) % dim_proc;
+        MPI_Sendrecv_replace(B, n * n, MPI_LONG_DOUBLE, dest, 0, from, 0, comm_col, &status);
 
         if( (k + rank_row) % dim_proc == rank_col) {
             matrix_multiply_add(C, A, B, n);
@@ -86,26 +91,6 @@ int main(int argc, char * argv[]){//beginning of main===========================
             matrix_multiply_add(C, bufferA, B, n);
         }
     }
-
-    //core computation
-    /* 
-    for (int k = 0; k < dim_proc; k ++) {
-        
-        //Row-wise broadcast
-        MPI_Bcast(rank_row == k ? A : bufferA, n * n, MPI_LONG_DOUBLE, k, comm_row);
-        //Column-wise broadcast
-        MPI_Bcast(rank_col == k ? B : bufferB, n * n, MPI_LONG_DOUBLE, k, comm_col);
-
-        if ((p_row == k) && (p_col == k)) {
-            matrix_multiply_add(C, A, B, n);
-        } else if (p_row == k) {
-            matrix_multiply_add(C, bufferA, B, n);
-        } else if (p_col == k) {
-            matrix_multiply_add(C, A, bufferB, n);
-        } else {
-            matrix_multiply_add(C, bufferA, bufferB, n);
-        }
-    }*/
 
     //check the sum and send to the root. report to user.
     for (int i = 0; i < n; i ++) {

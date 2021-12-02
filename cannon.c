@@ -67,79 +67,25 @@ int main(int argc, char * argv[]){//beginning of main===========================
     //split MPI_COMM_WORLD column-wise and get the rank in it
     MPI_Comm_split(MPI_COMM_WORLD, p_col, rank, &comm_col);
     MPI_Comm_rank(comm_col, &rank_col);
-
-    printf("================================================\n");
-    //check_comm_info(p_row, p_col, comm_row, comm_col, rank);
-    /*
-    printf("I am process %i = (%i, %i)\n", rank, p_row, p_col);
-    printf("My ranks are: %i = (%i, %i)\n", rank, rank_row, rank_col);
-    if(p_row != 0) {
-        int dest = (rank_row - p_row) % dim_proc;
-        if (dest < 0) {
-            dest += dim_proc;
-        }
-        int from = (rank_row + p_row) % dim_proc;
-        if (from < 0) {
-            from += dim_proc;
-        }
-        printf("I am sending A to rank_row %i\n", dest);
-        printf("I am receiving A from rank_row %i\n", from);
-    }
-
-    if(p_col != 0) {
-        int dest = (rank_col - rank_row) % dim_proc;
-        if (dest < 0) {
-            dest += dim_proc;
-        }
-        int from = (rank_col + rank_row) % dim_proc;
-        if (from < 0) {
-            from += dim_proc;
-        }
-        //printf("I am sending B to rank_col %i\n", dest);
-        //printf("I am receiving B from rank_col %i\n", from);
-    }*/
     
     //===============================================================
     //Preskewing
     // Row i shifts to the left by i
-    
     int dest, from;
     MPI_Status status;
     if (p_row != 0) {
         dest = (rank_row - p_row) % dim_proc;
         if (dest < 0) dest += dim_proc;
         from = (rank_row + p_row) % dim_proc;
-        // if (from < 0) {
-        //     from += dim_proc;
-        // }
-        //MPI_Bsend(A, n * n, MPI_LONG_DOUBLE, dest, 0, comm_row);
-        //MPI_Recv( A, n * n, MPI_LONG_DOUBLE, from, 0, comm_row, MPI_STATUS_IGNORE);
         MPI_Sendrecv_replace(A, n * n, MPI_LONG_DOUBLE, dest, 0, from, 0, comm_row, &status);
     }
-    //printf("I am process %i = (%i, %i)\n", rank, p_row, p_col);
-    
-    
-    // Col i shifts to the top by i
-    
-    
+        
     if (p_col != 0) {
         dest = (rank_col - p_col) % dim_proc;
         if (dest < 0) dest += dim_proc;
         from = (rank_col + p_col) % dim_proc;
-        // if (from < 0) {
-        //     from += dim_proc;
-        // }
-        //MPI_Bsend(B, n * n, MPI_LONG_DOUBLE, dest, 0, comm_col);
         MPI_Sendrecv_replace(B, n * n, MPI_LONG_DOUBLE, dest, 0, from, 0, comm_col, &status);
     }
-    //if(p_col != 0) {
-    //    MPI_Recv( B, n * n, MPI_LONG_DOUBLE, from, 0, comm_col, &status);
-    //}
-
-
-
-
-    printf("I am process %i = (%i, %i)\n", rank, p_row, p_col);
     
     // core computation
     for (int k = 0; k < dim_proc; k ++) {
@@ -148,27 +94,14 @@ int main(int argc, char * argv[]){//beginning of main===========================
         //horizontal shift
         dest = (rank_row - 1) % dim_proc;
         if(dest < 0) dest += dim_proc;
-
         from = (rank_row + 1) % dim_proc;
-        if(from < 0) from += dim_proc;
         MPI_Sendrecv_replace(A, n * n, MPI_LONG_DOUBLE, dest, 0, from, 0, comm_row, &status);
 
         //vertical shift
         dest = (rank_col - 1) % dim_proc;
         if(dest < 0) dest += dim_proc;
-
         from = (rank_col + 1) % dim_proc;
-        //if(from < 0) from += dim_proc;
         MPI_Sendrecv_replace(B, n * n, MPI_LONG_DOUBLE, dest, 0, from, 0, comm_col, &status);
-        /*
-        //horizontal shift
-        MPI_Bsend(A, n * n, MPI_LONG_DOUBLE, (rank_col - 1) % dim_proc, 0, comm_row);
-        //vertical shift
-        MPI_Bsend(B, n * n, MPI_LONG_DOUBLE, (rank_row - 1) % dim_proc, 0, comm_col);
-    
-        MPI_Recv(A, n * n, MPI_LONG_DOUBLE, (rank_col + 1) % dim_proc, 0, comm_row, MPI_STATUS_IGNORE);
-        MPI_Recv(B, n * n, MPI_LONG_DOUBLE, (rank_row + 1) % dim_proc, 0, comm_col, MPI_STATUS_IGNORE);
-        */
     }
 
     //Post skewing
