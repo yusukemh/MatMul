@@ -67,6 +67,11 @@ int main(int argc, char * argv[]){//beginning of main===========================
     //split MPI_COMM_WORLD column-wise and get the rank in it
     MPI_Comm_split(MPI_COMM_WORLD, p_col, rank, &comm_col);
     MPI_Comm_rank(comm_col, &rank_col);
+
+    double start_time;
+    if (rank == 0) {  
+        start_time = MPI_Wtime();
+    }
     
     //===============================================================
     //Preskewing
@@ -129,6 +134,10 @@ int main(int argc, char * argv[]){//beginning of main===========================
         } else {
             printf("ERROR: the sum is NOT correct!\n");
         }
+    }
+
+    if(rank == 0) {
+        printf("Elapsed time: %f\n", MPI_Wtime() - start_time);
     }
 
     //clean up

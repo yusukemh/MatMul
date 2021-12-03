@@ -68,6 +68,11 @@ int main(int argc, char * argv[]){//beginning of main===========================
     MPI_Comm_split(MPI_COMM_WORLD, p_col, rank, &comm_col);
     MPI_Comm_rank(comm_col, &rank_col);
 
+    double start_time;
+    if (rank == 0) {  
+        start_time = MPI_Wtime();
+    }
+
     /*sanity check: 
     * Print out the communicator information for debigging.
     * check_comm_info(p_row, p_col, comm_row, comm_col, rank);
@@ -85,7 +90,8 @@ int main(int argc, char * argv[]){//beginning of main===========================
         from = (rank_col + 1) % dim_proc;
         MPI_Sendrecv_replace(B, n * n, MPI_LONG_DOUBLE, dest, 0, from, 0, comm_col, &status);
 
-        if( (k + rank_row) % dim_proc == rank_col) {
+        //if( (k + rank_row) % dim_proc == rank_col) {
+        if(rank_row == root){
             matrix_multiply_add(C, A, B, n);
         } else {
             matrix_multiply_add(C, bufferA, B, n);
@@ -109,6 +115,10 @@ int main(int argc, char * argv[]){//beginning of main===========================
         } else {
             printf("ERROR: the sum is NOT correct!\n");
         }
+    }
+
+    if(rank == 0) {
+        printf("Elapsed time: %f\n", MPI_Wtime() - start_time);
     }
 
     //clean up
