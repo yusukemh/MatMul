@@ -69,13 +69,13 @@ int main(int argc, char * argv[]){//beginning of main===========================
     MPI_Comm_rank(comm_col, &rank_col);
 
     double start_time;
+    MPI_Barrier(MPI_COMM_WORLD);
     if (rank == 0) {  
         start_time = MPI_Wtime();
     }
     
     //===============================================================
-    //Preskewing
-    // Row i shifts to the left by i
+    //Preskewing of A
     int dest, from;
     MPI_Status status;
     if (p_row != 0) {
@@ -84,7 +84,8 @@ int main(int argc, char * argv[]){//beginning of main===========================
         from = (rank_row + p_row) % dim_proc;
         MPI_Sendrecv_replace(A, n * n, MPI_LONG_DOUBLE, dest, 0, from, 0, comm_row, &status);
     }
-        
+
+    //Preskewing of B    
     if (p_col != 0) {
         dest = (rank_col - p_col) % dim_proc;
         if (dest < 0) dest += dim_proc;
@@ -109,7 +110,21 @@ int main(int argc, char * argv[]){//beginning of main===========================
         MPI_Sendrecv_replace(B, n * n, MPI_LONG_DOUBLE, dest, 0, from, 0, comm_col, &status);
     }
 
-    //Post skewing
+    //Postskewing of A
+    if(p_row != 0) {
+        dest = (rank_row + p_row) % dim_proc;
+        from = (rank_row - p_row) % dim_proc;
+        if(from < 0) from += dim_proc;
+        MPI_Sendrecv_replace(A, n * n, MPI_LONG_DOUBLE, dest, 0, from, 0, comm_row, &status);
+    }
+
+    //Postskewing of B
+    if(p_col != 0) {
+        dest = (rank_col + p_col) % dim_proc;
+        from = (rank_col - p_col) % dim_proc;
+        if(from < 0) from += dim_proc;
+        MPI_Sendrecv_replace(B, n * n, MPI_LONG_DOUBLE, dest, 0, from, 0, comm_col, &status);
+    }
 
 
     /*sanity check: 
@@ -124,8 +139,8 @@ int main(int argc, char * argv[]){//beginning of main===========================
         }
     }
     MPI_Reduce(&checksum_individual, &checksum_total, 1, MPI_LONG_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
     if (rank == 0) {
-        //long double t_sum = N * N * N * (N - 1) * (N - 1) / 2.0;// don't do this, it won't calculate correctly
         long double t_sum = pow(N, 3) * pow(N - 1, 2) / 2.0;
         printf("Computed Sum: %.0Lf\n", checksum_total);
         printf("Theoretical Sum: %.0Lf\n", t_sum);
@@ -134,9 +149,6 @@ int main(int argc, char * argv[]){//beginning of main===========================
         } else {
             printf("ERROR: the sum is NOT correct!\n");
         }
-    }
-
-    if(rank == 0) {
         printf("Elapsed time: %f\n", MPI_Wtime() - start_time);
     }
 
