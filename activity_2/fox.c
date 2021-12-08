@@ -40,7 +40,7 @@ int main(int argc, char * argv[]){//beginning of main===========================
     long double *B = (long double *)malloc(n * n * sizeof(long double));
     long double *C = (long double *)calloc(n * n,  sizeof(long double));
     long double *bufferA = (long double *)malloc(n * n * sizeof(long double));
-    long double *bufferB = (long double *)malloc(n * n * sizeof(long double));
+    //long double *bufferB = (long double *)malloc(n * n * sizeof(long double));
     
     //Determine the coordinates of the process
     int p_row = rank / dim_proc;
@@ -69,7 +69,6 @@ int main(int argc, char * argv[]){//beginning of main===========================
     MPI_Comm_rank(comm_col, &rank_col);
 
     double start_time;
-    MPI_Barrier(MPI_COMM_WORLD);
     if (rank == 0) {  
         start_time = MPI_Wtime();
     }
@@ -78,33 +77,24 @@ int main(int argc, char * argv[]){//beginning of main===========================
     * Print out the communicator information for debigging.
     * check_comm_info(p_row, p_col, comm_row, comm_col, rank);
     */
-
-    //core computation    
+    int dest, from, root;
+    MPI_Status status;
     for (int k = 0; k < dim_proc; k ++) {
-        
-        /* Deprecated: works, but sketchy.
-        //Row-wise broadcast
-        if (rank_row == k) {bufferA = A;}
-        MPI_Bcast(bufferA, n * n, MPI_LONG_DOUBLE, k, comm_row);
+        //broadcast k'th diagonal of A
+        root = (k + p_row) % dim_proc;
+        MPI_Bcast(rank_row == root ? A : bufferA, n * n, MPI_LONG_DOUBLE, root, comm_row);
 
-        //column-wise broadcast
-        if (rank_col == k) {bufferB = B;}
-        MPI_Bcast(bufferB, n * n, MPI_LONG_DOUBLE, k, comm_col);
-        */
-        
-        //Row-wise broadcast
-        MPI_Bcast(rank_row == k ? A : bufferA, n * n, MPI_LONG_DOUBLE, k, comm_row);
-        //Column-wise broadcast
-        MPI_Bcast(rank_col == k ? B : bufferB, n * n, MPI_LONG_DOUBLE, k, comm_col);
+        //vertical shift of B
+        dest = (rank_col - 1) % dim_proc;
+        if(dest < 0) dest += dim_proc;
+        from = (rank_col + 1) % dim_proc;
+        MPI_Sendrecv_replace(B, n * n, MPI_LONG_DOUBLE, dest, 0, from, 0, comm_col, &status);
 
-        if ((p_row == k) && (p_col == k)) {
+        //if( (k + rank_row) % dim_proc == rank_col) {
+        if(rank_row == root){
             matrix_multiply_add(C, A, B, n);
-        } else if (p_row == k) {
-            matrix_multiply_add(C, bufferA, B, n);
-        } else if (p_col == k) {
-            matrix_multiply_add(C, A, bufferB, n);
         } else {
-            matrix_multiply_add(C, bufferA, bufferB, n);
+            matrix_multiply_add(C, bufferA, B, n);
         }
     }
 
@@ -125,6 +115,9 @@ int main(int argc, char * argv[]){//beginning of main===========================
         } else {
             printf("ERROR: the sum is NOT correct!\n");
         }
+    }
+
+    if(rank == 0) {
         printf("Elapsed time: %f\n", MPI_Wtime() - start_time);
     }
 
