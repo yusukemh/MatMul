@@ -10,18 +10,18 @@ f-64:
 	docker run --rm -it -v /Users/yusukehatanaka/Desktop/github/MatMul:/home/smpi --user 501:20 henricasanova/ics632_smpi smpirun -np $(np) -platform cluster_crossbar_64.xml -hostfile hostfile_64.txt ./fox $(N)
 
 o-1600:
-	docker run --rm -it -v /Users/yusukehatanaka/Desktop/github/MatMul:/home/smpi --user 501:20 henricasanova/ics632_smpi smpirun --cfg=smpi/host-speed:5218505859.375f -np $(np) -platform ./platforms/cluster_1600.xml -hostfile ./platforms/hostfile_1600.txt ./matmul $(N)
+	docker run --rm -it -v /Users/yusukehatanaka/Desktop/github/MatMul:/home/smpi --user 501:20 henricasanova/ics632_smpi smpirun --cfg=smpi/host-speed:5218505859.375f -np $(np) -platform ./platforms/cluster_1600.xml -hostfile ./platforms/hostfile_1600.txt ./activity_2/matmul $(N)
 
 c-1600:
-	docker run --rm -it -v /Users/yusukehatanaka/Desktop/github/MatMul:/home/smpi --user 501:20 henricasanova/ics632_smpi smpirun --cfg=smpi/host-speed:5218505859.375f -np $(np) -platform ./platforms/cluster_1600.xml -hostfile ./platforms/hostfile_1600.txt ./cannon $(N)
+	docker run --rm -it -v /Users/yusukehatanaka/Desktop/github/MatMul:/home/smpi --user 501:20 henricasanova/ics632_smpi smpirun --cfg=smpi/host-speed:5218505859.375f -np $(np) -platform ./platforms/cluster_1600.xml -hostfile ./platforms/hostfile_1600.txt ./activity_2/cannon $(N)
 
 f-1600:
-	docker run --rm -it -v /Users/yusukehatanaka/Desktop/github/MatMul:/home/smpi --user 501:20 henricasanova/ics632_smpi smpirun --cfg=smpi/host-speed:5218505859.375f -np $(np) -platform ./platforms/cluster_1600.xml -hostfile ./platforms/hostfile_1600.txt ./fox $(N)
+	docker run --rm -it -v /Users/yusukehatanaka/Desktop/github/MatMul:/home/smpi --user 501:20 henricasanova/ics632_smpi smpirun --cfg=smpi/host-speed:5218505859.375f -np $(np) -platform ./platforms/cluster_1600.xml -hostfile ./platforms/hostfile_1600.txt ./activity_2/fox $(N)
 
 app: matmul.c cannon.c fox.c
-	docker run --rm -it -v /Users/yusukehatanaka/Desktop/github/MatMul:/home/smpi --user 501:20 henricasanova/ics632_smpi smpicc matmul.c -o matmul
-	docker run --rm -it -v /Users/yusukehatanaka/Desktop/github/MatMul:/home/smpi --user 501:20 henricasanova/ics632_smpi smpicc cannon.c -o cannon
-	docker run --rm -it -v /Users/yusukehatanaka/Desktop/github/MatMul:/home/smpi --user 501:20 henricasanova/ics632_smpi smpicc fox.c -o fox
+	docker run --rm -it -v /Users/yusukehatanaka/Desktop/github/MatMul:/home/smpi --user 501:20 henricasanova/ics632_smpi smpicc activity_2/matmul.c -o activity_2/matmul
+	docker run --rm -it -v /Users/yusukehatanaka/Desktop/github/MatMul:/home/smpi --user 501:20 henricasanova/ics632_smpi smpicc activity_2/cannon.c -o activity_2/cannon
+	docker run --rm -it -v /Users/yusukehatanaka/Desktop/github/MatMul:/home/smpi --user 501:20 henricasanova/ics632_smpi smpicc activity_2/fox.c -o activity_2/fox
 
 clean:
 	rm -f *.o run

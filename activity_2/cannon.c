@@ -59,6 +59,7 @@ int main(int argc, char * argv[]){//beginning of main===========================
         global_j -= n;
         global_i ++;
     }
+    printf("HELLOWORLD\n");
 
     //split MPI_COMM_WORLD row-wise and get the rank in it
     MPI_Comm_split(MPI_COMM_WORLD, p_row, rank, &comm_row);
