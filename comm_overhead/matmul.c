@@ -3,7 +3,6 @@
 #include <mpi.h>
 #include <math.h>
 #define EPSILON 1e-6
-#define FLOP_CALIBRATION_FACTOR 57.9
 
 int validate_p(int, int);
 static void program_abort(char *, char *);
@@ -37,11 +36,11 @@ int main(int argc, char * argv[]){//beginning of main===========================
     dim_proc = N / n;//the dimension of processes
 
     //Alocate the block and buffer
-    long double *A = (long double *)SMPI_SHARED_MALLOC(n * n * sizeof(long double));
-    long double *B = (long double *)SMPI_SHARED_MALLOC(n * n * sizeof(long double));
-    long double *C = (long double *)SMPI_SHARED_MALLOC(n * n * sizeof(long double));
-    long double *bufferA = (long double *)SMPI_SHARED_MALLOC(n * n * sizeof(long double));
-    long double *bufferB = (long double *)SMPI_SHARED_MALLOC(n * n * sizeof(long double));
+    long double *A = (long double *)malloc(n * n * sizeof(long double));
+    long double *B = (long double *)malloc(n * n * sizeof(long double));
+    long double *C = (long double *)calloc(n * n,  sizeof(long double));
+    long double *bufferA = (long double *)malloc(n * n * sizeof(long double));
+    long double *bufferB = (long double *)malloc(n * n * sizeof(long double));
     
     //Determine the coordinates of the process
     int p_row = rank / dim_proc;
@@ -49,17 +48,17 @@ int main(int argc, char * argv[]){//beginning of main===========================
 
     //initialize the arrays A and B
     //A[i,j] = i, B[i,j] = [i + j].
-    // int global_i = p_row * n;
-    // int global_j = p_col * n;
-    // for (int i = 0; i < n; i ++) {
-    //     for (int j = 0; j < n; j ++) {
-    //         A[i * n + j] = global_i;
-    //         B[i * n + j] = global_i + global_j;
-    //         global_j ++;
-    //     }
-    //     global_j -= n;
-    //     global_i ++;
-    // }
+    int global_i = p_row * n;
+    int global_j = p_col * n;
+    for (int i = 0; i < n; i ++) {
+        for (int j = 0; j < n; j ++) {
+            A[i * n + j] = global_i;
+            B[i * n + j] = global_i + global_j;
+            global_j ++;
+        }
+        global_j -= n;
+        global_i ++;
+    }
 
     //split MPI_COMM_WORLD row-wise and get the rank in it
     MPI_Comm_split(MPI_COMM_WORLD, p_row, rank, &comm_row);
@@ -74,83 +73,58 @@ int main(int argc, char * argv[]){//beginning of main===========================
     if (rank == 0) {  
         start_time = MPI_Wtime();
     }
-    
-    //===============================================================
-    //Preskewing of A
-    int dest, from;
-    MPI_Status status;
-
-    if (p_row != 0) {
-        dest = (rank_row - p_row) % dim_proc;
-        if (dest < 0) dest += dim_proc;
-        from = (rank_row + p_row) % dim_proc;
-        MPI_Sendrecv_replace(A, n * n, MPI_LONG_DOUBLE, dest, 0, from, 0, comm_row, &status);
-    }
-
-    //Preskewing of B    
-    if (p_col != 0) {
-        dest = (rank_col - p_col) % dim_proc;
-        if (dest < 0) dest += dim_proc;
-        from = (rank_col + p_col) % dim_proc;
-        MPI_Sendrecv_replace(B, n * n, MPI_LONG_DOUBLE, dest, 0, from, 0, comm_col, &status);
-    }
-
-    // core computation
-    for (int k = 0; k < dim_proc; k ++) {
-        matrix_multiply_add(C, A, B, n);
-
-        //horizontal shift
-        dest = (rank_row - 1) % dim_proc;
-        if(dest < 0) dest += dim_proc;
-        from = (rank_row + 1) % dim_proc;
-        MPI_Sendrecv_replace(A, n * n, MPI_LONG_DOUBLE, dest, 0, from, 0, comm_row, &status);
-
-        //vertical shift
-        dest = (rank_col - 1) % dim_proc;
-        if(dest < 0) dest += dim_proc;
-        from = (rank_col + 1) % dim_proc;
-        MPI_Sendrecv_replace(B, n * n, MPI_LONG_DOUBLE, dest, 0, from, 0, comm_col, &status);
-    }
-
-    //Postskewing of A
-    if(p_row != 0) {
-        dest = (rank_row + p_row) % dim_proc;
-        from = (rank_row - p_row) % dim_proc;
-        if(from < 0) from += dim_proc;
-        MPI_Sendrecv_replace(A, n * n, MPI_LONG_DOUBLE, dest, 0, from, 0, comm_row, &status);
-    }
-
-    //Postskewing of B
-    if(p_col != 0) {
-        dest = (rank_col + p_col) % dim_proc;
-        from = (rank_col - p_col) % dim_proc;
-        if(from < 0) from += dim_proc;
-        MPI_Sendrecv_replace(B, n * n, MPI_LONG_DOUBLE, dest, 0, from, 0, comm_col, &status);
-    }
-
 
     /*sanity check: 
     * Print out the communicator information for debigging.
     * check_comm_info(p_row, p_col, comm_row, comm_col, rank);
     */
 
+    //core computation    
+    for (int k = 0; k < dim_proc; k ++) {
+        
+        /* Deprecated: works, but sketchy.
+        //Row-wise broadcast
+        if (rank_row == k) {bufferA = A;}
+        MPI_Bcast(bufferA, n * n, MPI_LONG_DOUBLE, k, comm_row);
+
+        //column-wise broadcast
+        if (rank_col == k) {bufferB = B;}
+        MPI_Bcast(bufferB, n * n, MPI_LONG_DOUBLE, k, comm_col);
+        */
+        
+        //Row-wise broadcast
+        MPI_Bcast(rank_row == k ? A : bufferA, n * n, MPI_LONG_DOUBLE, k, comm_row);
+        //Column-wise broadcast
+        MPI_Bcast(rank_col == k ? B : bufferB, n * n, MPI_LONG_DOUBLE, k, comm_col);
+
+        if ((p_row == k) && (p_col == k)) {
+            matrix_multiply_add(C, A, B, n);
+        } else if (p_row == k) {
+            matrix_multiply_add(C, bufferA, B, n);
+        } else if (p_col == k) {
+            matrix_multiply_add(C, A, bufferB, n);
+        } else {
+            matrix_multiply_add(C, bufferA, bufferB, n);
+        }
+    }
+
     //check the sum and send to the root. report to user.
-    // for (int i = 0; i < n; i ++) {
-    //     for (int j = 0; j < n; j ++) {
-    //         checksum_individual += C[i * n + j];
-    //     }
-    // }
+    for (int i = 0; i < n; i ++) {
+        for (int j = 0; j < n; j ++) {
+            checksum_individual += C[i * n + j];
+        }
+    }
     MPI_Reduce(&checksum_individual, &checksum_total, 1, MPI_LONG_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-    MPI_Barrier(MPI_COMM_WORLD);
     if (rank == 0) {
-        // long double t_sum = pow(N, 3) * pow(N - 1, 2) / 2.0;
-        // printf("Computed Sum: %.0Lf\n", checksum_total);
-        // printf("Theoretical Sum: %.0Lf\n", t_sum);
-        // if (fabs(t_sum - checksum_total) < EPSILON) {
-        //     printf("CONGRATS: the sum is correct!\n");
-        // } else {
-        //     printf("ERROR: the sum is NOT correct!\n");
-        // }
+        //long double t_sum = N * N * N * (N - 1) * (N - 1) / 2.0;// don't do this, it won't calculate correctly
+        long double t_sum = pow(N, 3) * pow(N - 1, 2) / 2.0;
+        printf("Computed Sum: %.0Lf\n", checksum_total);
+        printf("Theoretical Sum: %.0Lf\n", t_sum);
+        if (fabs(t_sum - checksum_total) < EPSILON) {
+            printf("CONGRATS: the sum is correct!\n");
+        } else {
+            printf("ERROR: the sum is NOT correct!\n");
+        }
         printf("Elapsed time: %f\n", MPI_Wtime() - start_time);
     }
 
@@ -180,21 +154,18 @@ void check_comm_info(int p_row, int p_col, MPI_Comm comm_row, MPI_Comm comm_col,
     int name_length;
     MPI_Comm_get_name(comm_row, comm_row_name, &name_length);
     MPI_Comm_get_name(comm_col, comm_col_name, &name_length);
-    printf("I am process %i=(%i, %i), in communicator %s and %s.\n", rank, p_row, p_col, comm_row_name, comm_col_name);
+    printf("I am rank %i=(%i, %i), in communicator %s and %s.\n", rank, p_row, p_col, comm_row_name, comm_col_name);
 }
 
 
 void matrix_multiply_add(long double *C, long double *A, long double *B, int n) {
-    double flops = (double)n*n*n * (double)FLOP_CALIBRATION_FACTOR ;
-    SMPI_SAMPLE_FLOPS(flops) {
-        // for (int i = 0; i < n; i ++ ) {
-        //     for (int j = 0; j < n; j ++) {
-        //         //i, j traverses the C matrix
-        //         for (int iter = 0; iter < n; iter ++) {
-        //             C[i * n + j] += A[i * n + iter] * B[iter * n + j];
-        //         }
-        //     }
-        // }
+    for (int i = 0; i < n; i ++ ) {
+        for (int j = 0; j < n; j ++) {
+            //i, j traverses the C matrix
+            for (int iter = 0; iter < n; iter ++) {
+                C[i * n + j] += A[i * n + iter] * B[iter * n + j];
+            }
+        }
     }
 }
 
