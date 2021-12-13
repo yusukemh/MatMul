@@ -69,6 +69,8 @@ int main(int argc, char * argv[]){//beginning of main===========================
     MPI_Comm_rank(comm_col, &rank_col);
 
     double start_time;
+    double clock;
+    double comm_time = 0;
     MPI_Barrier(MPI_COMM_WORLD);
     if (rank == 0) {  
         start_time = MPI_Wtime();
@@ -91,11 +93,12 @@ int main(int argc, char * argv[]){//beginning of main===========================
         if (rank_col == k) {bufferB = B;}
         MPI_Bcast(bufferB, n * n, MPI_LONG_DOUBLE, k, comm_col);
         */
-        
+        clock = MPI_Wtime();
         //Row-wise broadcast
         MPI_Bcast(rank_row == k ? A : bufferA, n * n, MPI_LONG_DOUBLE, k, comm_row);
         //Column-wise broadcast
         MPI_Bcast(rank_col == k ? B : bufferB, n * n, MPI_LONG_DOUBLE, k, comm_col);
+        comm_time += MPI_Wtime() - clock;
 
         if ((p_row == k) && (p_col == k)) {
             matrix_multiply_add(C, A, B, n);
@@ -126,6 +129,7 @@ int main(int argc, char * argv[]){//beginning of main===========================
             printf("ERROR: the sum is NOT correct!\n");
         }
         printf("Elapsed time: %f\n", MPI_Wtime() - start_time);
+        printf("Comm time: %f\n", comm_time);
     }
 
     //clean up

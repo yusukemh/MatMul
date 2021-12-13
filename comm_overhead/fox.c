@@ -69,6 +69,8 @@ int main(int argc, char * argv[]){//beginning of main===========================
     MPI_Comm_rank(comm_col, &rank_col);
 
     double start_time;
+    double clock;
+    double comm_time = 0;
     if (rank == 0) {  
         start_time = MPI_Wtime();
     }
@@ -80,6 +82,11 @@ int main(int argc, char * argv[]){//beginning of main===========================
     int dest, from, root;
     MPI_Status status;
     for (int k = 0; k < dim_proc; k ++) {
+        
+        if(rank == 0) {
+            clock = MPI_Wtime();
+        }
+        
         //broadcast k'th diagonal of A
         root = (k + p_row) % dim_proc;
         MPI_Bcast(rank_row == root ? A : bufferA, n * n, MPI_LONG_DOUBLE, root, comm_row);
@@ -89,6 +96,10 @@ int main(int argc, char * argv[]){//beginning of main===========================
         if(dest < 0) dest += dim_proc;
         from = (rank_col + 1) % dim_proc;
         MPI_Sendrecv_replace(B, n * n, MPI_LONG_DOUBLE, dest, 0, from, 0, comm_col, &status);
+
+        if(rank == 0) {
+            comm_time += MPI_Wtime() - clock;
+        }
 
         //if( (k + rank_row) % dim_proc == rank_col) {
         if(rank_row == root){
@@ -119,6 +130,7 @@ int main(int argc, char * argv[]){//beginning of main===========================
 
     if(rank == 0) {
         printf("Elapsed time: %f\n", MPI_Wtime() - start_time);
+        printf("Comm time: %f\n", comm_time);
     }
 
     //clean up

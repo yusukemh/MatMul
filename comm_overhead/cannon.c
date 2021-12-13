@@ -69,9 +69,12 @@ int main(int argc, char * argv[]){//beginning of main===========================
     MPI_Comm_rank(comm_col, &rank_col);
 
     double start_time;
+    double clock;
+    double comm_time = 0;
     MPI_Barrier(MPI_COMM_WORLD);
     if (rank == 0) {  
         start_time = MPI_Wtime();
+        clock = MPI_Wtime();
     }
     
     //===============================================================
@@ -92,10 +95,17 @@ int main(int argc, char * argv[]){//beginning of main===========================
         from = (rank_col + p_col) % dim_proc;
         MPI_Sendrecv_replace(B, n * n, MPI_LONG_DOUBLE, dest, 0, from, 0, comm_col, &status);
     }
+    if(rank == 0) {
+        comm_time += MPI_Wtime() - clock;
+    }
     
     // core computation
     for (int k = 0; k < dim_proc; k ++) {
         matrix_multiply_add(C, A, B, n);
+
+        if(rank == 0) {
+            clock = MPI_Wtime();
+        }
 
         //horizontal shift
         dest = (rank_row - 1) % dim_proc;
@@ -108,6 +118,14 @@ int main(int argc, char * argv[]){//beginning of main===========================
         if(dest < 0) dest += dim_proc;
         from = (rank_col + 1) % dim_proc;
         MPI_Sendrecv_replace(B, n * n, MPI_LONG_DOUBLE, dest, 0, from, 0, comm_col, &status);
+        
+        if(rank == 0) {
+            comm_time += MPI_Wtime() - clock;
+        }
+    }
+
+    if(rank == 0) {
+        clock = MPI_Wtime();
     }
 
     //Postskewing of A
@@ -124,6 +142,9 @@ int main(int argc, char * argv[]){//beginning of main===========================
         from = (rank_col - p_col) % dim_proc;
         if(from < 0) from += dim_proc;
         MPI_Sendrecv_replace(B, n * n, MPI_LONG_DOUBLE, dest, 0, from, 0, comm_col, &status);
+    }
+    if(rank == 0) {
+        comm_time += MPI_Wtime() - clock;
     }
 
 
@@ -150,6 +171,7 @@ int main(int argc, char * argv[]){//beginning of main===========================
             printf("ERROR: the sum is NOT correct!\n");
         }
         printf("Elapsed time: %f\n", MPI_Wtime() - start_time);
+        printf("Comm time: %f\n", comm_time);
     }
 
     //clean up
