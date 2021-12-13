@@ -3,7 +3,7 @@
 #include <mpi.h>
 #include <math.h>
 #define EPSILON 1e-6
-#define FLOP_CALIBRATION_FACTOR 1000
+#define FLOP_CALIBRATION_FACTOR 57.9
 
 int validate_p(int, int);
 static void program_abort(char *, char *);
